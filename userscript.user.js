@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.4_1
+// @version      2.5
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -23,6 +23,7 @@ class Mod {
             gui: null,
             three: null
         }
+        this.defaultSettings = null
         this.settings = {
             degToRad: false,
             backupMap: false,
@@ -33,6 +34,10 @@ class Mod {
             gridSize: 100,
             gridDivisions: 10,
             objectHighlight: false,
+            mergeVoxels: false,
+            phOpacity: 0.3,
+            phEmissive: '#FFFFFF',
+            phColor:'#FFFFFF',
         }
         this.intersected = null
         this.voxelSize = 10
@@ -441,7 +446,7 @@ class Mod {
     
     spawnPlaceholder() {
         let pos = this.hooks.editor.camera.getWorldPosition()
-        let obph = {p: [], s: [10, 10, 10], e: 16777215, o: 0.3, c: 0}
+        let obph = {p: [], s: [10, 10, 10], e: this.settings.phEmissive, o: this.settings.phOpacity, c: this.settings.phColor}
         obph.p[0] = pos.x
         obph.p[1] = pos.y - 10
         obph.p[2] = pos.z
@@ -512,8 +517,8 @@ class Mod {
 
             for (let voxel of vlist) 
                 mapout.objects.push(this.voxelToObject(voxel))
-
-            mapout.objects = this.mergeVoxels(mapout.objects)
+             
+            if (this.settings.mergeVoxels) mapout.objects = this.mergeVoxels(mapout.objects)
             if (insert) this.replaceObject(JSON.stringify(mapout.objects));
             if (!insert) this.download(JSON.stringify(mapout), 'convertedVoxels.txt', 'text/plain');
         //} catch (e) {
@@ -524,7 +529,6 @@ class Mod {
     }
 
     convert(insert = false) {
-        return alert('Still a WIP');
         this.loadFile('convertVoxel', insert)
     }
 
@@ -794,6 +798,7 @@ class Mod {
     }
     
     setupSettings() {
+        this.defaultSettings = JSON.parse(JSON.stringify(this.settings));
         let ls = this.getSavedVal('krunker_editor_mod')
         if (ls == null) return
         try {
@@ -805,6 +810,14 @@ class Mod {
         for (let set in jsp) {
             this.settings[set] = jsp[set]
         }
+    }
+    
+    resetSettings() {
+        for (let set in this.settings) {
+            console.log(set, this.defaultSettings[set])
+            this.setSettings(set, this.defaultSettings[set])
+        }
+        alert('Please refresh for this to take effect');
     }
     
     setSettings(k, v) {
@@ -841,26 +854,18 @@ class Mod {
         options.cut = (() => this.copyObjects(true))
         options.paste = (() => this.pasteObjects())
         options.texture = "DEFAULT"
-        options.degToRad = this.settings.degToRad
-        options.backupMap = this.settings.backupMap
-        options.antiAlias = this.settings.antiAlias
-        options.highPrecision = this.settings.highPrecision
-        options.scaleMapX = 0
-        options.scaleMapY = 0
-        options.scaleMapZ = 0      
+        options.scaleMapX = 1.0
+        options.scaleMapY = 1.0
+        options.scaleMapZ = 1.0     
         options.scaleMap = (() => this.scaleMap())    
         options.transformMap = (() => this.transformMap())
         options.colorizeR = (() => this.colorizeMap(false, false, true))
         options.colorizeG = (() => this.colorizeMap(false, true))
         options.colorizeI = (() => this.colorizeMap(prompt("Input colors. (Seperate using a comma)", "")))
-        options.gridVisibility = this.settings.gridVisibility
-        options.gridOpacity = this.settings.gridOpacity
-        options.gridDivisions = this.settings.gridDivisions
-        options.gridSize = this.settings.gridSize
         options.voxelConvert = (() => this.convert()) 
         options.voxelImport = (() => this.convert(true)) 
         options.editColor = (() => this.editGroup('color', prompt("Input color", "")))
-        options.objectHighlight = this.settings.objectHighlight
+        options.reset = (() => this.resetSettings())  
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
@@ -874,6 +879,7 @@ class Mod {
         this.assetMenu.add(options, "textGen").name("Text Generator")
         
         let voxelsMenu = this.assetMenu.addFolder('Voxels')
+        voxelsMenu.add(this.settings, "mergeVoxels").name("Merge").onChange(t => {this.setSettings('mergeVoxels', t)})    
         voxelsMenu.add(options, "voxelConvert").name("Convert")
         voxelsMenu.add(options, "voxelImport").name("Import")
         
@@ -919,17 +925,23 @@ class Mod {
         */
         
         let settingsMenu = this.mainMenu.addFolder('Settings')
-        settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})      
-        settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
-        settingsMenu.add(options, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
-        settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")}) 
-        settingsMenu.add(options, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)}) 
+        settingsMenu.add(this.settings, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})      
+        settingsMenu.add(this.settings, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
+        settingsMenu.add(this.settings, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
+        settingsMenu.add(this.settings, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")}) 
+        settingsMenu.add(this.settings, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)}) 
+        settingsMenu.add(options, "reset").name("Reset")
 
         let gridMenu = settingsMenu.addFolder('Grid')
-        gridMenu.add(options, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})      
-        gridMenu.add(options, "gridOpacity", 0.05, 1, 0.05).name("Opacity").onChange(t => {this.setSettings('gridOpacity', t)})
-        gridMenu.add(options, "gridSize").name("Size").onChange(t => {this.setSettings('gridSize', t)})      
-        gridMenu.add(options, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)}) 
+        gridMenu.add(this.settings, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})      
+        gridMenu.add(this.settings, "gridOpacity", 0.05, 1, 0.05).name("Opacity").onChange(t => {this.setSettings('gridOpacity', t)})
+        gridMenu.add(this.settings, "gridSize").name("Size").onChange(t => {this.setSettings('gridSize', t)})      
+        gridMenu.add(this.settings, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)}) 
+        
+        let placeholderMenu = settingsMenu.addFolder('Placeholder')
+        placeholderMenu.add(this.settings, "phOpacity", 0, 1, .1).name("Opacity").onChange(t => {this.setSettings('phOpacity', t)})      
+        placeholderMenu.addColor(this.settings, "phEmissive",).name("Emissive").onChange(t => {this.setSettings('phEmissive', t)})
+        placeholderMenu.addColor(this.settings, "phColor").name("Color").onChange(t => {this.setSettings('phColor', t)})      
     }
     
     assetFolder(assets, menu) {
