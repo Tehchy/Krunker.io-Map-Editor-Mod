@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.5
+// @version      2.5.1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -105,7 +105,7 @@ class Mod {
             let rotation = this.rotation;
             if (fix) {
                 this.hooks.gui.__folders["Object Config"].__controllers[1].setValue(false)
-                rotation = this.toDegree(selected.rotation.y) + 180
+                rotation = 360 - this.toDegree(selected.rotation.y)
             }
              
             if (rotation > 0) {
@@ -817,7 +817,8 @@ class Mod {
             console.log(set, this.defaultSettings[set])
             this.setSettings(set, this.defaultSettings[set])
         }
-        alert('Please refresh for this to take effect');
+        this.gui.updateDisplay();
+        alert('Some settings require a refresh take effect');
     }
     
     setSettings(k, v) {

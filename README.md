@@ -29,11 +29,15 @@
 1. Select a object you want to be replaced
 2. Select from the Prefab Menu or Click Replace Object to input json
 
-### Requirements:
+
+### How to Install
 - Install [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en)
+- [CLICK HERE](https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/userscript.user.js)
+- Click Install & Refresh
+
+### Requirements:
+- [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en)
 - ES6 Support
-### Userscript: [CLICK HERE](https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/userscript.user.js)
+
 ### Video: [Showcase](https://youtu.be/mNtAKJ6g1MA)
-
-
 ### Join use on Discord [MMOK](https://discord.gg/ybkUe5)
