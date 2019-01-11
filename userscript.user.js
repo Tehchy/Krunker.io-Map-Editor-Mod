@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.5.1
+// @version      2.5.2
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.2
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -309,6 +309,7 @@ class Mod {
                 "objects": obs
             }
         this.download(JSON.stringify(obs), 'asset_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
+        this.gui.__folders["Map Editor Mod v" + this.version].__folders['MultiObject'].__folders['Export'].close()
     }
     
     pasteObjects() {
@@ -690,6 +691,40 @@ class Mod {
         this.replaceObject(JSON.stringify(objects), true)
     }
     
+    frameObject() {
+        let selected = this.objectSelected()
+        if (!selected) return alert('Please Select a object')
+        let thickness = this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].__controllers[0].getValue(),
+            ceiling = this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].__controllers[1].getValue(),
+            floor = this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].__controllers[2].getValue()
+
+        if (thickness < 1) return alert('Wall Thickness must be 1 or greator')
+        let pos = selected.position
+        let size = selected.scale
+        let cN = {p:[pos.x, pos.y, pos.z - (size.z / 2) - (thickness / 2)], s:[size.x + (thickness * 2), size.y, thickness]}
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cN))
+        
+        let cS = {p:[pos.x, pos.y, pos.z + (size.z / 2) + (thickness / 2)], s:[size.x + (thickness * 2), size.y, thickness]}
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cS))
+        
+        let cW = {p:[pos.x - (size.x / 2) - (thickness / 2), pos.y, pos.z], s:[thickness, size.y, size.z]}
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cW))
+        
+        let cE = {p:[pos.x + (size.x / 2) + (thickness / 2), pos.y, pos.z], s:[thickness, size.y, size.z]}
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cE))
+        
+        let cT = {p:[pos.x, pos.y + size.y, pos.z], s:[size.x + (thickness * 2), thickness, size.z + (thickness * 2)]}
+        if (ceiling) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cT))
+        
+        let cB = {p:[pos.x, pos.y - thickness, pos.z], s:[size.x + (thickness * 2), thickness, size.z + (thickness * 2)]}
+        if (floor) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cB))
+
+        this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].__controllers[0].setValue(10)
+        this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].__controllers[1].setValue(false)
+        this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].__controllers[2].setValue(false)
+        this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].close()
+    }
+    
     transformMap() {
         return alert('This will be functional in a later update')
     }
@@ -866,7 +901,11 @@ class Mod {
         options.voxelConvert = (() => this.convert()) 
         options.voxelImport = (() => this.convert(true)) 
         options.editColor = (() => this.editGroup('color', prompt("Input color", "")))
-        options.reset = (() => this.resetSettings())  
+        options.reset = (() => this.resetSettings())   
+        options.frameObject = (() => this.frameObject())
+        options.frameThickness = 10
+        options.frameCeiling = false
+        options.frameFloor = false
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
@@ -917,8 +956,14 @@ class Mod {
         let scaleMapMenu = otherMenu.addFolder("Scale Map")
         scaleMapMenu.add(options, "scaleMapX").name("X") 
         scaleMapMenu.add(options, "scaleMapY").name("Y") 
-        scaleMapMenu.add(options, "scaleMapZ").name("Z") 
+        scaleMapMenu.add(options, "scaleMapZ").name("Z")     
         scaleMapMenu.add(options, "scaleMap").name("Scale")
+        
+        let frameMenu = otherMenu.addFolder("Frame")
+        frameMenu.add(options, "frameThickness").name("Wall Thickness") 
+        frameMenu.add(options, "frameCeiling").name("Has Ceiling") 
+        frameMenu.add(options, "frameFloor").name("Has Floor") 
+        frameMenu.add(options, "frameObject").name("Frame It")
         
         /*
         let transformMenu = otherMenu.addFolder("Transform Map")
@@ -930,8 +975,7 @@ class Mod {
         settingsMenu.add(this.settings, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
         settingsMenu.add(this.settings, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
         settingsMenu.add(this.settings, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")}) 
-        settingsMenu.add(this.settings, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)}) 
-        settingsMenu.add(options, "reset").name("Reset")
+        settingsMenu.add(this.settings, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)})
 
         let gridMenu = settingsMenu.addFolder('Grid')
         gridMenu.add(this.settings, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})      
@@ -942,7 +986,9 @@ class Mod {
         let placeholderMenu = settingsMenu.addFolder('Placeholder')
         placeholderMenu.add(this.settings, "phOpacity", 0, 1, .1).name("Opacity").onChange(t => {this.setSettings('phOpacity', t)})      
         placeholderMenu.addColor(this.settings, "phEmissive",).name("Emissive").onChange(t => {this.setSettings('phEmissive', t)})
-        placeholderMenu.addColor(this.settings, "phColor").name("Color").onChange(t => {this.setSettings('phColor', t)})      
+        placeholderMenu.addColor(this.settings, "phColor").name("Color").onChange(t => {this.setSettings('phColor', t)}) 
+
+        settingsMenu.add(options, "reset").name("Reset")        
     }
     
     assetFolder(assets, menu) {
@@ -977,10 +1023,11 @@ GM_xmlhttpRequest({
             .replace('("Ambient Light").listen().onChange', '("Ambient Color").onChange')
             .replace('("Light Color").listen().onChange', '("Light Color").onChange')
             .replace('("Fog Color").listen().onChange', '("Fog Color").onChange')
-            .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.objectInstance = $1;const')
+            .replace(/((\w+).boundingNoncollidableBoxMaterial=new .*}\);)const/, '$1 window.mod.hooks.objectInstance = $2;const')
             //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.editor = $1')
             .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.editor = this,window.mod.loop()')
             .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,')
+            .replace(/(Object\.assign\(this\.mapConfig,\w+\))/, '$1, window.mod.hooks.gui.updateDisplay(),this.scene.background = new window.mod.hooks.three.Color(this.mapConfig.sky),this.skyLight.color.set(this.mapConfig.light),this.scene.fog.color.set(this.mapConfig.fog),this.scene.fog.far = this.mapConfig.fogD')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
             .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
             .replace('{this.removeObject()}', '{window.mod.objectSelected(true) ? window.mod.removeGroup() : this.removeObject()}')
