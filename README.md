@@ -40,4 +40,4 @@
 - ES6 Support
 
 ### Video: [Showcase](https://youtu.be/mNtAKJ6g1MA)
-### Join use on Discord [MMOK](https://discord.gg/ybkUe5)
+### Join use on Discord [MMOK](https://discord.gg/3vVuv5X)

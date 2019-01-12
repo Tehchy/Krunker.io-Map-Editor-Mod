@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.5.2
+// @version      2.5.3
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.2
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -259,7 +259,7 @@ class Mod {
         
         if (!group) {
             if (cut && obbys.length && !group) {
-                for (var i = 0; i < obbys.length; i++) {
+                for (let i = 0; i < obbys.length; i++) {
                     this.hooks.editor.removeObject(obbys[i])
                 }
             }
@@ -328,13 +328,13 @@ class Mod {
         
         this.groups[selected.uuid].objects.push(selected.uuid)
         let obs = this.hooks.editor.objInstances.filter(ob => this.groups[selected.uuid].objects.includes(ob.boundingMesh.uuid))
-       /* for (var i = 0; i < this.hooks.editor.objInstances.length; i++) {
+       /* for (let i = 0; i < this.hooks.editor.objInstances.length; i++) {
             if (!this.groups[selected.uuid].objects.includes(this.hooks.editor.objInstances[i].boundingMesh.uuid)) continue
             
                 remOb.push(this.hooks.editor.objInstances[i])
         }*/
             
-        for (var i = 0; i < obs.length; i++)
+        for (let i = 0; i < obs.length; i++)
             this.hooks.editor.removeObject(obs[i])
         
         delete this.groups[selected.uuid]
@@ -371,7 +371,7 @@ class Mod {
     checkGroup() {
         if (Object.keys(this.groups).length == 0) return
         
-        for (var uuid in this.groups) {
+        for (let uuid in this.groups) {
             let group = this.groups[uuid]
             
             //Position Change Check
@@ -725,6 +725,84 @@ class Mod {
         this.gui.__folders["Map Editor Mod v" + this.version].__folders['Other Features'].__folders['Frame'].close()
     }
     
+    exportToObj()  {
+        let object = this.hooks.editor.scene
+        let THREE = this.hooks.three;
+        let output = '';
+        let indexVertex = 0;
+        let indexVertexUvs = 0;
+        let indexNormals = 0;
+        let vertex = new THREE.Vector3();
+        let normal = new THREE.Vector3();
+        let uv = new THREE.Vector2();
+        let i, j, l, m, face = [];
+        let parseMesh = function (mesh) {
+            let nbVertex = 0;
+            let nbNormals = 0;
+            let nbVertexUvs = 0;
+            let geometry = mesh.geometry;
+            let normalMatrixWorld = new THREE.Matrix3();
+            if (geometry instanceof THREE.Geometry) geometry = new THREE.BufferGeometry().setFromObject(mesh);
+            if (geometry instanceof THREE.BufferGeometry) {
+                let vertices = geometry.getAttribute('position');
+                let normals = geometry.getAttribute('normal');
+                let uvs = geometry.getAttribute('uv');
+                let indices = geometry.getIndex();
+                output += 'o ' + mesh.name + '\n';
+                if (vertices !== undefined) {
+                    for (i = 0, l = vertices.count; i < l; i ++, nbVertex++) {
+                        vertex.x = vertices.getX(i);
+                        vertex.y = vertices.getY(i);
+                        vertex.z = vertices.getZ(i);
+                        vertex.applyMatrix4(mesh.matrixWorld);
+                        output += 'v ' + vertex.x + ' ' + vertex.y + ' ' + vertex.z + '\n';
+                    }
+                }
+                if (uvs !== undefined) {
+                    for (i = 0, l = uvs.count; i < l; i ++, nbVertexUvs++) {
+                        uv.x = uvs.getX( i );
+                        uv.y = uvs.getY( i );
+                        output += 'vt ' + uv.x + ' ' + uv.y + '\n';
+                    }
+                }
+                if (normals !== undefined) {
+                    normalMatrixWorld.getNormalMatrix(mesh.matrixWorld);
+                    for (i = 0, l = normals.count; i < l; i ++, nbNormals++) {
+                        normal.x = normals.getX(i);
+                        normal.y = normals.getY(i);
+                        normal.z = normals.getZ(i);
+                        normal.applyMatrix3(normalMatrixWorld);
+                        output += 'vn ' + normal.x + ' ' + normal.y + ' ' + normal.z + '\n';
+                    }
+                }
+                if (indices !== null) {
+                    for (i = 0, l = indices.count; i < l; i += 3) {
+                        for (m = 0; m < 3; m++) {
+                            j = indices.getX(i + m) + 1;
+                            face[m] = (indexVertex + j) + '/' + (uvs ? (indexVertexUvs + j) : '' ) + '/' + (indexNormals + j);
+                        }
+                        output += 'f ' + face.join(' ') + "\n";
+                    }
+                } else {
+                    for (i = 0, l = vertices.count; i < l; i += 3) {
+                        for (m = 0; m < 3; m++){
+                            j = i + m + 1;
+                            face[m] = (indexVertex + j) + '/' + (uvs ? (indexVertexUvs + j) : '' ) + '/' + (indexNormals + j);
+                        }
+                        output += 'f ' + face.join(' ') + "\n";
+                    }
+                }
+            } else {
+                console.warn( 'THREE.OBJExporter.parseMesh(): geometry type unsupported', geometry );
+            }
+            indexVertex += nbVertex;
+            indexVertexUvs += nbVertexUvs;
+            indexNormals += nbNormals;
+        };
+        for (let i = 4; i < object.children.length; i++) if (object.children[i] instanceof THREE.Mesh) parseMesh(object.children[i]);
+        this.download(output, 'model.obj', 'text/plain');
+    }   
+    
     transformMap() {
         return alert('This will be functional in a later update')
     }
@@ -906,6 +984,7 @@ class Mod {
         options.frameThickness = 10
         options.frameCeiling = false
         options.frameFloor = false
+        options.exportToObj = (() => this.exportToObj())
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
@@ -964,6 +1043,8 @@ class Mod {
         frameMenu.add(options, "frameCeiling").name("Has Ceiling") 
         frameMenu.add(options, "frameFloor").name("Has Floor") 
         frameMenu.add(options, "frameObject").name("Frame It")
+        
+        otherMenu.add(options, "exportToObj").name("Export To Obj") 
         
         /*
         let transformMenu = otherMenu.addFolder("Transform Map")
