@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6
+// @version      2.6.1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
@@ -1234,8 +1234,8 @@ GM_xmlhttpRequest({
             .replace(/(},xyzKeys:)/, '\nthis.hideTransform();$1')
             
             .replace(/((this\.container\.addEventListener)\("mousedown")/, '$2("mousemove", window.mod.onMouseMove),$1')
-            .replace(/((\w+)=>{)(this\.importMap\(\))/, '$1$2.shiftKey ? window.mod.importMapFile() : $2')
-            .replace(/((\w+)=>{)(this\.exportMap\(\))/, '$1$2.shiftKey ? (window.mod.copyToClipboard(this.getMapExport()), $2) : $2')
+            .replace(/((\w+)=>{)(this\.importMap\(\))/, '$1$2.shiftKey ? window.mod.importMapFile() : $3')
+            .replace(/((\w+)=>{)(this\.exportMap\(\))/, '$1 if($2.shiftKey)window.mod.copyToClipboard(this.getMapExport()); $3')
             
         GM_xmlhttpRequest({
             method: "GET",
