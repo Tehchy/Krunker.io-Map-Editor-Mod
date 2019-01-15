@@ -3,9 +3,9 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6.1
+// @version      2.6.2
 // @author       Tehchy
-// @match        https://krunker.io/editor.html
+// @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
@@ -123,7 +123,7 @@ class Mod {
             let rotation = this.rotation;
             if (fix) {
                 this.hooks.gui.__folders["Object Config"].__controllers[1].setValue(false);
-                rotation = 360 - this.toDegree(selected.rotation.y);
+                if (fix == "VEHICLE") rotation = 360 - this.toDegree(selected.rotation.y);
             }
              
             if (rotation > 0) {
@@ -134,7 +134,7 @@ class Mod {
             for (let ob of jsp) {
                 ob.p[0] += selected.userData.owner.position.x - center[0];
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1];
-                ob.p[2] += selected.userData.owner.position.z - center[2] - (fix ? 0.5 : 0);
+                ob.p[2] += selected.userData.owner.position.z - center[2] - (fix == "VEHICLE" ? 0.5 : 0);
                 
                 this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob), skip);
             }
@@ -530,8 +530,17 @@ class Mod {
         }
     }
 
-    fixVehicle() {
-        this.replaceObject('[{"p":[0,0,0],"s":[47,9,17],"v":1},{"p":[5,9,0],"s":[26,6,17],"v":1}]', false, true);
+    fixHitbox() {
+        let selected = this.objectSelected();
+        if (!selected) return;
+        switch(selected.userData.owner.objType) {
+            case 'VEHICLE':
+                this.replaceObject('[{"p":[0,0,0],"s":[47,9,17],"v":1},{"p":[5,9,0],"s":[26,6,17],"v":1}]', false, selected.userData.owner.objType);
+                break;
+            case 'TREE':
+                this.replaceObject('[{"p":[0,0,0],"s":[9,55,9],"v":1},{"p":[0,37,16],"s":[15,15,15],"v":1},{"p":[0,30,-16],"s":[15,15,15],"v":1},{"p":[0,29,11],"s":[4,4,13],"v":1},{"p":[0,33,16],"s":[4,4,4],"v":1},{"p":[0,36,-6],"s":[4,4,5],"v":1},{"p":[0,55,0],"s":[37,37,37],"v":1}]', false, selected.userData.owner.objType);
+                break;
+        }
     }
 
     spawnPlaceholder() {
@@ -946,7 +955,7 @@ class Mod {
                     case 86:
                         return t.ctrlKey ? this.pasteObjects() : false;
                     case 70:
-                        return t.shiftKey ? this.fixVehicle() : false;
+                        return t.shiftKey ? this.fixHitbox() : false;
                     case 82:
                         return t.shiftKey ? this.hooks.editor.duplicateObject() : false;
                     case 80: 
@@ -1115,7 +1124,7 @@ class Mod {
         groupingMenu.add(options, "paste").name("Paste");
         
         let editMenu = groupingMenu.addFolder("Edit");
-        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "GRID", Grey: "GREY", Roof: "ROOF", Flag: "FLAG"};
+        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "GRID", Grey: "GREY", Roof: "ROOF", Flag: "FLAG", Grass: "GRASS", Check: "CHECK"};
         editMenu.add(options, "texture").options(textures).name("Texture").listen().onChange(t => {
             this.editGroup('texture', t);
         });
@@ -1201,7 +1210,7 @@ class Mod {
 
 GM_xmlhttpRequest({
     method: "GET",
-    url: "https://krunker.io/js/editor.js",
+    url: `${document.location.origin}/js/editor.js`,
     onload: res => {
         let code = res.responseText;
         code = code.replace(/String\.prototype\.escape=function\(\){(.*)\)},(Number\.)/, "$2")
@@ -1222,10 +1231,10 @@ GM_xmlhttpRequest({
             .replace(/precision:"mediump"/g, 'precision:window.mod.settings.highPrecision ? "highp": "mediump"')
             .replace(/GridHelper\(100,10\)/, 'GridHelper(window.mod.settings.gridSize, window.mod.settings.gridDivisions)')
             
-            //Object Adding Optimization
-            .replace(/addObject\((\w+)\){/, 'addObject($1, multi=false){')
-            .replace(/(this\.scene\.add\(.+\.arrowHelper\)),(this\.attachTransform\(.+\.boundingMesh\))/, '$1; if(!multi)$2')
-            .replace(/this\.addObject\((\w+\.deserialize\(\w+\))\);/, 'this.addObject($1, true);')
+            //Object Adding Optimization (Added to editor thx sidney)
+            //.replace(/addObject\((\w+)\){/, 'addObject($1, multi=false){')
+            //.replace(/(this\.scene\.add\(.+\.arrowHelper\)),(this\.attachTransform\(.+\.boundingMesh\))/, '$1; if(!multi)$2')
+            //.replace(/this\.addObject\((\w+\.deserialize\(\w+\))\);/, 'this.addObject($1, true);')
         
             //Object Removing Optimization
             .replace(/removeObject\((\w+)\){/, 'removeObject($1, multi=false){')
@@ -1239,7 +1248,7 @@ GM_xmlhttpRequest({
             
         GM_xmlhttpRequest({
             method: "GET",
-            url: "https://krunker.io/editor.html",
+            url: `${document.location.origin}/editor.html`,
             onload: res => {
                 let html = res.responseText;
                 html = html.replace(' src="js/editor.js">', `>${Mod.toString()}\nwindow.mod = new Mod(${JSON.stringify(GM.info.script.version)});\n${code.toString()}`);
