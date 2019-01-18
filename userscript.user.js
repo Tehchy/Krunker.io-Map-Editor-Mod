@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6.2
+// @version      2.6.3
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
@@ -614,7 +614,7 @@ class Mod {
             for (let voxel of vlist) 
                 mapout.objects.push(this.voxelToObject(voxel));
              
-            if (this.settings.mergeVoxels) mapout.objects = this.mergeVoxels(mapout.objects);
+            if (this.settings.mergeVoxels) mapout.objects = this.mergeObjects(mapout.objects);
             if (insert) this.replaceObject(JSON.stringify(mapout.objects));
             if (!insert) this.download(JSON.stringify(mapout), 'convertedVoxels.txt', 'text/plain');
         //} catch (e) {
@@ -639,101 +639,37 @@ class Mod {
         };
     }
 
-    mergeVoxels(objs) {
-        console.log('Merging Y');
-        while (true) {
-            let objectsMerged = 0;
-            for (let obj of objs) {
-                let voxelAbove = this.searchObjects(objs, [obj.p[0], obj.p[1] + obj.s[1], obj.p[2]]);
-                if (voxelAbove != -1) {
-                    obj.s[1] += objs[voxelAbove].s[1];
-                    objs.pop(voxelAbove);
-                    objectsMerged++;
-                }
-            }
-            if (objectsMerged == 0) break;
-        }
-        console.log('Merging X');
-        while (true) {
-            let objectsMerged = 0;
-            for (let obj of objs) {
-                let searchPos = obj.p[0];
-                searchPos += this.voxelSize;
-                let voxelRight = this.searchObjects(objs, [searchPos, obj.p[1], obj.p[2]]);
-                while (voxelRight != -1) {
-                    let objRight = objs[voxelRight];
-                    if (objRight.s[1] == obj.s[1]) {
-                        obj.s[0] += objRight.s[0];
-                        obj.p[0] += parseInt(objRight.s[0] / 2);
-                        objs.pop(voxelRight);
+    mergeObjects(objs) {
+        if(objs.length < 2) return objs;
+
+        let objectsMerged = 0;
+        for (let axis = 0; axis < 3; axis++) {
+            let axis1 = (axis + 1) % 3;
+            let axis2 = (axis + 2) % 3;
+            for (let i = 0; i < objs.length - 1; i++) {
+                for (let j = i + 1; j < objs.length; j++) {
+                    let cmi = axis % 2 ? objs[i].p[axis] + objs[i].s[axis] / 2 : objs[i].p[axis];//center of mass
+                    let cmj = axis % 2 ? objs[j].p[axis] + objs[j].s[axis] / 2 : objs[j].p[axis];
+                    if (objs[j].s[axis1] == objs[i].s[axis1] && objs[j].s[axis2] == objs[i].s[axis2] && 
+                        objs[j].p[axis1] == objs[i].p[axis1] && objs[j].p[axis2] == objs[i].p[axis2] && 
+                        Math.abs(cmj - cmi) <= Math.abs(objs[j].s[axis] / 2 + objs[i].s[axis] / 2)) {
+                        let sX = Math.abs(cmj - cmi) + Math.abs(objs[j].s[axis] / 2 + objs[i].s[axis] / 2);
+                        let pX = (cmj + (objectsMerged + 1) * cmi) / (objectsMerged + 2);
+                        if(axis == 1) pX = Math.min(objs[i].p[axis], objs[j].p[axis]);
+                        objs[i].p[axis] = pX;
+                        objs[i].s[axis] = sX;
+                        objs.splice(j, 1);
                         objectsMerged++;
-                    } else
-                        break;
-
-                    searchPos += this.voxelSize;
-                    voxelRight = this.searchObjects(objs, [searchPos, obj.p[1], obj.p[2]]);
-                }
-            }
-            if (objectsMerged == 0) break;
-        }
-        console.log('Merging Z');
-        while (true) {
-            let objectsMerged = 0;
-            for (let obj of objs) {
-                let searchPos = obj.p[2]
-                searchPos += this.voxelSize;
-                let voxelFoward = this.searchObjects(objs, [obj.p[0], obj.p[1], searchPos]);
-                while (voxelFoward != -1) {
-
-                    if (obj.p[0] == 210 && obj.p[2] > 100 && obj.p[1] == 50) {
-                        //debug?
-                        alert('error');
+                        j--; 
                     }
-
-                    let objFoward = objs[voxelFoward];
-                    if (objFoward.s[1] == obj.s[1] && objFoward.s[0] == obj.s[0]) {
-                        obj.s[2] += objFoward.s[2];
-                        obj.p[2] += parseInt(objFoward.s[2] / 2);
-                        objs.pop(voxelFoward);
-                        objectsMerged++;
-                    } else
-                        break;
-                    
-                    searchPos += this.voxelSize;
-                    voxelFoward = this.searchObjects(objs, [obj.p[0], obj.p[1], searchPos]);
                 }
-            }
-            if (objectsMerged == 0) break;
+                objectsMerged = 0;
+            } 
         }
+
         return objs;
     }
 
-    searchObjects(objs, pos) {
-        let min = 0;
-        let max = objs.length - 1;
-        let guessIndex = parseInt(max/2);
-        let guessPos = objs[guessIndex].p;
-        while (JSON.stringify(guessPos) != JSON.stringify(pos)) {
-            if (guessPos[1] > pos[1]) {
-                max = guessIndex - 1;
-            } else if (guessPos[1] < pos[1]) {
-                min = guessIndex + 1;
-            } else if (guessPos[2] > pos[2]) {
-                max = guessIndex - 1;
-            } else if (guessPos[2] < pos[2]) {
-                min = guessIndex + 1;
-            } else if (guessPos[0] > pos[0]) {
-                max = guessIndex - 1;
-            } else if (guessPos[0] < pos[0]) {
-                min = guessIndex + 1;
-            }
-            if(max < min) return -1;
-            
-            guessIndex = parseInt((min + max) / 2);
-            guessPos = objs[guessIndex].p;
-        }
-        return guessIndex;
-    }
 
     textToObjects() {
         let input = prompt("Input text", "");
@@ -797,22 +733,22 @@ class Mod {
         let pos = selected.position;
         let size = selected.scale;
         let cN = {p:[pos.x, pos.y, pos.z - (size.z / 2) - (thickness / 2)], s:[size.x + (thickness * 2), size.y, thickness]};
-        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cN));
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cN), true);
         
         let cS = {p:[pos.x, pos.y, pos.z + (size.z / 2) + (thickness / 2)], s:[size.x + (thickness * 2), size.y, thickness]};
-        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cS));
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cS), true);
         
         let cW = {p:[pos.x - (size.x / 2) - (thickness / 2), pos.y, pos.z], s:[thickness, size.y, size.z]};
-        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cW));
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cW), true);
         
         let cE = {p:[pos.x + (size.x / 2) + (thickness / 2), pos.y, pos.z], s:[thickness, size.y, size.z]};
-        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cE));
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cE), true);
         
         let cT = {p:[pos.x, pos.y + size.y, pos.z], s:[size.x + (thickness * 2), thickness, size.z + (thickness * 2)]};
-        if (ceiling) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cT));
+        if (ceiling) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cT), true);
         
         let cB = {p:[pos.x, pos.y - thickness, pos.z], s:[size.x + (thickness * 2), thickness, size.z + (thickness * 2)]};
-        if (floor) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cB));
+        if (floor) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(cB), true);
 
         this.mainMenu.__folders['Other Features'].__folders['Frame'].__controllers[0].setValue(10);
         this.mainMenu.__folders['Other Features'].__folders['Frame'].__controllers[1].setValue(false);
@@ -1105,13 +1041,6 @@ class Mod {
         this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  ;
         this.assetMenu.add(options, "json").name("Json Import");
         this.assetMenu.add(options, "file").name("File Import");
-        this.assetMenu.add(options, "textGen").name("Text Generator");
-        
-        let voxelsMenu = this.assetMenu.addFolder('Voxels');
-        voxelsMenu.add(this.settings, "mergeVoxels").name("Merge").onChange(t => {this.setSettings('mergeVoxels', t)});
-        voxelsMenu.add(options, "voxelConvert").name("Convert");
-        voxelsMenu.add(options, "voxelImport").name("Import");
-        
         this.assetFolder(assets, this.assetMenu);
         
         let groupingMenu = this.mainMenu.addFolder("MultiObject");
@@ -1158,6 +1087,12 @@ class Mod {
         frameMenu.add(options, "frameFloor").name("Has Floor"); 
         frameMenu.add(options, "frameObject").name("Frame It");  
         
+        let voxelsMenu = otherMenu.addFolder('Voxels');
+        voxelsMenu.add(this.settings, "mergeVoxels").name("Merge").onChange(t => {this.setSettings('mergeVoxels', t)});
+        voxelsMenu.add(options, "voxelConvert").name("Convert");
+        voxelsMenu.add(options, "voxelImport").name("Import");
+        
+        otherMenu.add(options, "textGen").name("Text Generator");
         otherMenu.add(options, "exportToObj").name("Export To Obj");
         
         /*
