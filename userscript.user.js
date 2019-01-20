@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6.3
+// @version      2.6.4
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
@@ -38,6 +38,8 @@ class Mod {
             phOpacity: 0.3,
             phEmissive: '#FFFFFF',
             phColor:'#FFFFFF',
+            speedNormal: 70,
+            speedSprint: 180,
         };
         this.intersected = null;
         this.voxelSize = 10;
@@ -1030,7 +1032,8 @@ class Mod {
         options.frameFloor = false;
         options.exportToObj = (() => this.exportToObj());
         options.reflectDir = 0;
-        options.reflectMap = (() => this.reflectMap())
+        options.reflectMap = (() => this.reflectMap());
+        options.speedReset = (() => (this.setSettings('speedNormal', 70), this.setSettings('speedSprint', 180), this.gui.updateDisplay()));
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version);
         this.mainMenu.open();
@@ -1112,7 +1115,12 @@ class Mod {
         gridMenu.add(this.settings, "gridOpacity", 0.05, 1, 0.05).name("Opacity").onChange(t => {this.setSettings('gridOpacity', t)});
         gridMenu.add(this.settings, "gridSize").name("Size").onChange(t => {this.setSettings('gridSize', t)});      
         gridMenu.add(this.settings, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)}); 
-        
+
+        let speedMenu = settingsMenu.addFolder('Speed');
+        speedMenu.add(this.settings, "speedNormal").name("Normal").onChange(t => {this.setSettings('speedNormal', t)});      
+        speedMenu.add(this.settings, "speedSprint").name("Sprinting").onChange(t => {this.setSettings('speedSprint', t)});
+        speedMenu.add(options, "speedReset").name("Reset");
+
         let placeholderMenu = settingsMenu.addFolder('Placeholder');
         placeholderMenu.add(this.settings, "phOpacity", 0, 1, .1).name("Opacity").onChange(t => {this.setSettings('phOpacity', t)});
         placeholderMenu.addColor(this.settings, "phEmissive",).name("Emissive").onChange(t => {this.setSettings('phEmissive', t)});
@@ -1180,6 +1188,7 @@ GM_xmlhttpRequest({
             .replace(/((this\.container\.addEventListener)\("mousedown")/, '$2("mousemove", window.mod.onMouseMove),$1')
             .replace(/((\w+)=>{)(this\.importMap\(\))/, '$1$2.shiftKey ? window.mod.importMapFile() : $3')
             .replace(/((\w+)=>{)(this\.exportMap\(\))/, '$1 if($2.shiftKey)window.mod.copyToClipboard(this.getMapExport()); $3')
+            .replace(/this\.moveSprint\?180:70/, 'this.moveSprint ? window.mod.settings.speedSprint : window.mod.settings.speedNormal')
             
         GM_xmlhttpRequest({
             method: "GET",
