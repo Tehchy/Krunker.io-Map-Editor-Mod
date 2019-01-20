@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6.4
+// @version      2.6.5
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
@@ -953,7 +953,7 @@ class Mod {
     }
 
     removeAd() {//Sorry Sidney it blocks my second GUI
-        document.body.removeChild(document.body.children[0]);
+        document.body.removeChild(document.body.children[2]);
     }
 
     setupSettings() {
