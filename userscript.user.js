@@ -953,7 +953,7 @@ class Mod {
     }
 
     removeAd() {//Sorry Sidney it blocks my second GUI
-        document.body.removeChild(document.body.children[2]);
+        document.body.removeChild(document.body.children[1]);
     }
 
     setupSettings() {
