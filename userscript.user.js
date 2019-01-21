@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6.5
+// @version      2.6.6
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
@@ -595,6 +595,17 @@ class Mod {
             ob.pos = pos;
         }
     }
+    
+    breakableMap() {
+        if (this.settings.backupMap) this.backupMap();
+        if (!confirm("Are you sure you want to make the whole map breakable?")) return;
+        let health = this.mainMenu.__folders["Other Features"].__folders["Breakable Map"].__controllers[0].getValue(),
+        forcecol = this.mainMenu.__folders["Other Features"].__folders["Breakable Map"].__controllers[0].getValue();
+        for (let ob of this.hooks.editor.objInstances) {
+            ob.health = health;
+            if (forcecol) ob.collidable = true;
+        }
+    }
 
     convertVoxel(str, insert = false) {
         if (insert && ! this.objectSelected()) return alert('Select a object to replace first');
@@ -953,7 +964,11 @@ class Mod {
     }
 
     removeAd() {//Sorry Sidney it blocks my second GUI
-        document.body.removeChild(document.body.children[1]);
+        for (let child of document.body.children) {
+            if (child.textContent.includes("Advanced Editor")) {
+                return document.body.removeChild(child);
+            }
+        }
     }
 
     setupSettings() {
@@ -1034,6 +1049,10 @@ class Mod {
         options.reflectDir = 0;
         options.reflectMap = (() => this.reflectMap());
         options.speedReset = (() => (this.setSettings('speedNormal', 70), this.setSettings('speedSprint', 180), this.gui.updateDisplay()));
+        options.breakableHealth = 1;
+        options.breakableCollision = false;
+        options.breakableMap = (() => this.breakableMap());
+        
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version);
         this.mainMenu.open();
@@ -1093,7 +1112,12 @@ class Mod {
         let voxelsMenu = otherMenu.addFolder('Voxels');
         voxelsMenu.add(this.settings, "mergeVoxels").name("Merge").onChange(t => {this.setSettings('mergeVoxels', t)});
         voxelsMenu.add(options, "voxelConvert").name("Convert");
-        voxelsMenu.add(options, "voxelImport").name("Import");
+        voxelsMenu.add(options, "voxelImport").name("Import"); 
+        
+        let breakableMenu = otherMenu.addFolder('Breakable Map');
+        breakableMenu.add(options, "breakableHealth", 1, 0, 1000).name("Health");
+        breakableMenu.add(options, "breakableCollision").name("Force Collision");
+        breakableMenu.add(options, "breakableMap").name("Execute");
         
         otherMenu.add(options, "textGen").name("Text Generator");
         otherMenu.add(options, "exportToObj").name("Export To Obj");
