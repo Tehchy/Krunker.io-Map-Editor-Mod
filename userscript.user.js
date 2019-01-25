@@ -6,7 +6,7 @@
 // @version      2.7.0
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.7.0
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
