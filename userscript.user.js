@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.7.0
+// @version      2.7.1
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.7.0
@@ -41,6 +41,7 @@ class Mod {
             speedNormal: 70,
             speedSprint: 180,
             voxelSize: 10,
+            imageSize: 1,
             assetAutoGroup: false,
         };
         this.intersected = null;
@@ -60,7 +61,7 @@ class Mod {
         return selected ? (group ? (Object.keys(this.groups).includes(selected.uuid) ? selected : false) : selected) : false;
     }
 
-    loadFile(callback, args = []) {
+    loadFile(callback, img = false, args = []) {
         let file = document.createElement('input');
         file.type = 'file';
         file.id = 'jsonInput';
@@ -73,12 +74,21 @@ class Mod {
 
             reader.onload = (theFile => {
                 return e => {
-                    args.unshift(e.target.result);
-                    self[callback](...args);
+                    if (img) {
+                        let img2 = new Image();
+                        img2.onload = () => {
+                            args.unshift(img2);
+                            self[callback](...args);
+                        }
+                        img2.src = e.target.result;
+                    } else {
+                        args.unshift(e.target.result);
+                        self[callback](...args);
+                    }
                 };
             })(f);
 
-            reader.readAsText(f);
+            if (img) { reader.readAsDataURL(f); } else { reader.readAsText(f); }
         }, false);
         
         file.type = 'file';
@@ -90,14 +100,14 @@ class Mod {
 
     jsonInput(fromfile = false) {
         if (fromfile) {
-            return this.loadFile('replaceObject', [true, false, this.settings.assetAutoGroup]);
+            return this.loadFile('replaceObject', false, [true, false, this.settings.assetAutoGroup]);
         }
         let json = prompt("Import Object Json", "");
         if (json != null && json != "" && this.objectSelected()) this.replaceObject(json, true, false, true);
     }
     
     importMapFile(t = null) {
-        if (!t) return this.loadFile('importMapFile');
+        if (!t) return this.loadFile('importMapFile', false);
         try {
             let e = JSON.parse(t);
             this.hooks.editor.clearMap();
@@ -398,12 +408,7 @@ class Mod {
         let nme = prompt("Name your asset", "");
         if (nme == null || nme == "") return alert('Please name your asset');
             
-        let center = this.findCenter(obs);
-        for (let ob of obs) {
-            ob.p[0] -= center[0];
-            ob.p[1] -= center[1];
-            ob.p[2] -= center[2];
-        }
+        obs = this.applyCenter(obs);
     
         if (full) 
             obs = {
@@ -656,8 +661,51 @@ class Mod {
         
     }
 
-    convert(insert = false) {
-        this.loadFile('convertVoxel', [insert]);
+    convertImage(img, insert = false) {
+        if (insert && ! this.objectSelected()) return alert('Select a object to replace first');
+        let canvas = document.createElement('canvas');
+        let ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        let data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let colors = [];
+        let objects = [];
+
+        for (let i = 0; i < data.length; i += 4) {
+            let rgb = this.rgbArrayToHex([data[i], data[i + 1], data[i + 2]])
+            let opacity = data[i + 3] / 255;
+            opacity = Math.round(opacity * 100) / 100;
+            colors.push([rgb, opacity]);
+        }
+        let height = 0; 
+        let horizontal = 0; 
+        for (let i = 0; i < colors.length; i++) {
+            horizontal += 1; 
+            if (i % canvas.width == 0) {
+                height++;
+                horizontal = 0; 
+            }
+            if (colors[i][1] == 0) continue;
+            let ob = {"p": [horizontal, -1 * height, 0], "s": [this.settings.imageSize, this.settings.imageSize, this.settings.imageSize], "c": colors[i][0], "c": colors[i][0]};
+            if (colors[i][1] != 1) ob.o = colors[i][1];
+            objects.push(ob);
+        }
+        objects = this.mergeObjects(objects);
+        let center = this.findCenter(objects);
+        for (let ob of objects){
+            ob.p[0] -= center[0];
+            ob.p[1] -= center[1];
+            ob.p[2] -= center[2];
+        }
+        let map = {"name":"New Krunker Map","modURL":"","ambient":9937064,"light":15923452,"sky":14477549,"fog":9280160,"fogD":900,"camPos":[0,0,0],"spawns":[],"objects":[]};
+        map.objects = objects;
+        if (insert) this.replaceObject(JSON.stringify(map.objects));
+        if (!insert) this.download(JSON.stringify(map), 'convertedImage.txt', 'text/plain');
+    }
+
+    convert(insert = false, img = false) {
+        this.loadFile(img ? 'convertImage' : 'convertVoxel', img, [insert]);
     }
 
     voxelToObject(voxel) {
@@ -667,7 +715,7 @@ class Mod {
                 parseInt(voxel[1]) * this.settings.voxelSize, 
                 parseInt(voxel[2]) * this.settings.voxelSize
             ], 
-            's': [this.settings.voxelSize, this.settings.voxelSize, this.settings.voxelSize]
+            's': [this.settings.voxelSize, this.settings.voxelSize, this.settings.voxelSize],
         };
     }
 
@@ -682,9 +730,13 @@ class Mod {
                 for (let j = i + 1; j < objs.length; j++) {
                     let cmi = axis % 2 ? objs[i].p[axis] + objs[i].s[axis] / 2 : objs[i].p[axis];//center of mass
                     let cmj = axis % 2 ? objs[j].p[axis] + objs[j].s[axis] / 2 : objs[j].p[axis];
-                    if (objs[j].s[axis1] == objs[i].s[axis1] && objs[j].s[axis2] == objs[i].s[axis2] && 
-                        objs[j].p[axis1] == objs[i].p[axis1] && objs[j].p[axis2] == objs[i].p[axis2] && 
-                        Math.abs(cmj - cmi) <= Math.abs(objs[j].s[axis] / 2 + objs[i].s[axis] / 2)) {
+                    if (objs[j].s[axis1] == objs[i].s[axis1] && objs[j].s[axis2] == objs[i].s[axis2] &&
+                        objs[j].p[axis1] == objs[i].p[axis1] && objs[j].p[axis2] == objs[i].p[axis2] &&
+                        Math.abs(cmj - cmi) <= Math.abs(objs[j].s[axis] / 2 + objs[i].s[axis] / 2) &&
+                        ((objs[j].c || 0) === (objs[i].c || 0)) &&
+                        ((objs[j].o || 1) === (objs[i].o || 1)) &&
+                        ((objs[j].t || 0) === (objs[i].t || 0)) &&
+                        ((objs[j].e || 0x0) === (objs[i].e || 0x0))) {
                         let sX = Math.abs(cmj - cmi) + Math.abs(objs[j].s[axis] / 2 + objs[i].s[axis] / 2);
                         let pX = (cmj + (objectsMerged + 1) * cmi) / (objectsMerged + 2);
                         if(axis == 1) pX = Math.min(objs[i].p[axis], objs[j].p[axis]);
@@ -1057,6 +1109,8 @@ class Mod {
         options.colorizeI = (() => this.colorizeMap(prompt("Input colors. (Seperate using a comma)", "")));
         options.voxelConvert = (() => this.convert());
         options.voxelImport = (() => this.convert(true)); 
+        options.imageConvert = (() => this.convert(false, true));
+        options.imageImport = (() => this.convert(true, true)); 
         options.editColor = (() => this.editGroup('color', prompt("Input color", "")));
         options.reset = (() => this.resetSettings());
         options.frameObject = (() => this.frameObject());
@@ -1133,6 +1187,11 @@ class Mod {
         voxelsMenu.add(this.settings, "voxelSize").name("Size").onChange(t => {this.setSettings('voxelSize', t)});
         voxelsMenu.add(options, "voxelConvert").name("Convert");
         voxelsMenu.add(options, "voxelImport").name("Import"); 
+        
+        let imageMenu = otherMenu.addFolder('Image Converter');
+        imageMenu.add(this.settings, "imageSize").name("Size").onChange(t => {this.setSettings('imageSize', t)});
+        imageMenu.add(options, "imageConvert").name("Convert");
+        imageMenu.add(options, "imageImport").name("Import"); 
         
         let breakableMenu = otherMenu.addFolder('Breakable Map');
         breakableMenu.add(options, "breakableHealth", 1, 0, 1000).name("Health");
