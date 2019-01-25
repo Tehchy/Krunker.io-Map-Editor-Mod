@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.6.6
+// @version      2.7.0
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.5.3
@@ -40,9 +40,10 @@ class Mod {
             phColor:'#FFFFFF',
             speedNormal: 70,
             speedSprint: 180,
+            voxelSize: 10,
+            assetAutoGroup: false,
         };
         this.intersected = null;
-        this.voxelSize = 10;
         this.copy = null;
         this.groups = [];
         this.rotation = 0;
@@ -59,7 +60,7 @@ class Mod {
         return selected ? (group ? (Object.keys(this.groups).includes(selected.uuid) ? selected : false) : selected) : false;
     }
 
-    loadFile(callback, args = null) {
+    loadFile(callback, args = []) {
         let file = document.createElement('input');
         file.type = 'file';
         file.id = 'jsonInput';
@@ -72,7 +73,8 @@ class Mod {
 
             reader.onload = (theFile => {
                 return e => {
-                    self[callback](e.target.result, args);
+                    args.unshift(e.target.result);
+                    self[callback](...args);
                 };
             })(f);
 
@@ -88,10 +90,10 @@ class Mod {
 
     jsonInput(fromfile = false) {
         if (fromfile) {
-            return this.loadFile('replaceObject', true);
+            return this.loadFile('replaceObject', [true, false, this.settings.assetAutoGroup]);
         }
         let json = prompt("Import Object Json", "");
-        if (json != null && json != "" && this.objectSelected()) this.replaceObject(json, true);
+        if (json != null && json != "" && this.objectSelected()) this.replaceObject(json, true, false, true);
     }
     
     importMapFile(t = null) {
@@ -105,12 +107,11 @@ class Mod {
             for (let t of e.spawns) this.hooks.editor.addObject(new this.hooks.objectInstance({id: 5, p: [t[0], t[1], t[2]], tm: t[3]}), true);
             Object.assign(this.hooks.editor.mapConfig, e)
         } catch (t) {
-            console.log(t),
             alert("Failed to import map with error:\n" + t.toString())
         }
     }
 
-    replaceObject(str, skip = false, fix = false) {
+    replaceObject(str, skip = false, fix = false, autoGroup = false) {
         let selected = this.objectSelected();
         if (!selected) {
             //this.hooks.editor.addObject(this.hooks.objectInstance.defaultFromType("CUBE"))
@@ -132,19 +133,36 @@ class Mod {
                 jsp = this.rotateObjects(jsp, rotation);
             }
             
+            let objectIds = [];
             let center = this.findCenter(jsp);
             for (let ob of jsp) {
                 ob.p[0] += selected.userData.owner.position.x - center[0];
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1];
                 ob.p[2] += selected.userData.owner.position.z - center[2] - (fix == "VEHICLE" ? 0.5 : 0);
-                
-                this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob), skip);
+                let obj = this.hooks.objectInstance.deserialize(ob);
+                if (autoGroup) objectIds.push(obj.boundingMesh.uuid);
+                this.hooks.editor.addObject(obj, skip);
+            }
+            if (autoGroup) {
+                let groupBox = this.createBoundingBox(selected.position.x, selected.position.y, selected.position.z, center[3], center[4], center[5], rotation);
+                this.hooks.editor.addObject(groupBox);
+                this.groups[groupBox.boundingMesh.uuid] = {
+                    owner: groupBox.boundingMesh, 
+                    pos: {x: groupBox.boundingMesh.position.x , y: groupBox.boundingMesh.position.y, z: groupBox.boundingMesh.position.z}, 
+                    scale: {x: groupBox.boundingMesh.scale.x, y: groupBox.boundingMesh.scale.y, z: groupBox.boundingMesh.scale.z},
+                    objects: objectIds
+                };
             }
             this.rotation = 0;
-            this.assetMenu.__controllers[0].setValue(this.rotation);
+            this.assetMenu.__controllers[1].setValue(this.rotation);
         } else {
             alert("You must select a object first");
         }
+    }
+    
+    createBoundingBox(x, y, z, sX, sY, sZ, rY) {
+        let obph = {p: [x, y, z], s: [sX + 1, sY + 1, sZ + 1], r: [0, rY, 0], e: this.settings.phEmissive, o: this.settings.phOpacity, c: this.settings.phColor};
+        return this.hooks.objectInstance.deserialize(obph);
     }
 
     toRadians(angle) {
@@ -220,42 +238,43 @@ class Mod {
     }
 
     findCenter(jsp) {
-        let min = jsp[0].p[1],
-        xMin = jsp[0].p[0] - (jsp[0].s[0] /2),
-        xMax = jsp[0].p[0] + (jsp[0].s[0] /2),
-        yMin = jsp[0].p[2] - (jsp[0].s[2] /2),
-        yMax = jsp[0].p[2] + (jsp[0].s[2] /2);
-
+        let yMin = jsp[0].p[1],
+        yMax = jsp[0].p[1] + jsp[0].s[1],
+        xMin = jsp[0].p[0] - (jsp[0].s[0] / 2),
+        xMax = jsp[0].p[0] + (jsp[0].s[0] / 2),
+        zMin = jsp[0].p[2] - (jsp[0].s[2] / 2),
+        zMax = jsp[0].p[2] + (jsp[0].s[2] / 2);
 
         for (let ob of jsp) {
-            if (ob.p[1]  < min) min = ob.p[1];
-            if (ob.p[0] - (ob.s[0] /2) < xMin) xMin = ob.p[0] - (ob.s[0] /2);
-            if (ob.p[0] + (ob.s[0] /2) > xMax) xMax = ob.p[0] + (ob.s[0] /2);
-            if (ob.p[2] - (ob.s[2] /2) < yMin) yMin = ob.p[2] - (ob.s[2] /2);
-            if (ob.p[2] + (ob.s[2] /2) > yMax) yMax = ob.p[2] + (ob.s[2] /2);
+            if (ob.p[1] < yMin) yMin = ob.p[1];
+            if (ob.p[1] + ob.s[1] > yMax) yMax = ob.p[1] + ob.s[1];
+            if (ob.p[0] - (ob.s[0] / 2) < xMin) xMin = ob.p[0] - (ob.s[0] / 2);
+            if (ob.p[0] + (ob.s[0] / 2) > xMax) xMax = ob.p[0] + (ob.s[0] / 2);
+            if (ob.p[2] - (ob.s[2] / 2) < zMin) zMin = ob.p[2] - (ob.s[2] / 2);
+            if (ob.p[2] + (ob.s[2] / 2) > zMax) zMax = ob.p[2] + (ob.s[2] / 2);
         }
 
-        return [Math.round((xMin + xMax)/2), min, Math.round((yMin + yMax)/2)];
+        return [Math.round((xMin + xMax) / 2), yMin, Math.round((zMin + zMax) / 2), Math.round(Math.abs(xMin) + Math.abs(xMax)), yMax, Math.round(Math.abs(zMin) + Math.abs(zMax))];
     }
-    
+
     findMapCenter() {
         let jsp = this.hooks.editor.objInstances,
-        min = jsp[0].position.y,
-        xMin = jsp[0].position.x - (jsp[0].scale.x /2),
-        xMax = jsp[0].position.x + (jsp[0].scale.x /2),
-        yMin = jsp[0].position.z - (jsp[0].scale.z /2),
-        yMax = jsp[0].position.z + (jsp[0].scale.z /2);
+        yMin = jsp[0].position.y,
+        xMin = jsp[0].position.x - (jsp[0].scale.x / 2),
+        xMax = jsp[0].position.x + (jsp[0].scale.x / 2),
+        zMin = jsp[0].position.z - (jsp[0].scale.z / 2),
+        zMax = jsp[0].position.z + (jsp[0].scale.z / 2);
 
 
         for (let ob of jsp) {
-            if (ob.pos[1]  < min) min = ob.pos[1];
-            if (ob.pos[0] - (ob.size[0] /2) < xMin) xMin = ob.pos[0] - (ob.size[0] /2);
-            if (ob.pos[0] + (ob.size[0] /2) > xMax) xMax = ob.pos[0] + (ob.size[0] /2);
-            if (ob.pos[2] - (ob.size[2] /2) < yMin) yMin = ob.pos[2] - (ob.size[2] /2);
-            if (ob.pos[2] + (ob.size[2] /2) > yMax) yMax = ob.pos[2] + (ob.size[2] /2);
+            if (ob.pos[1]  < yMin) yMin = ob.pos[1];
+            if (ob.pos[0] - (ob.size[0] / 2) < xMin) xMin = ob.pos[0] - (ob.size[0] / 2);
+            if (ob.pos[0] + (ob.size[0] / 2) > xMax) xMax = ob.pos[0] + (ob.size[0] / 2);
+            if (ob.pos[2] - (ob.size[2] / 2) < zMin) zMin = ob.pos[2] - (ob.size[2] / 2);
+            if (ob.pos[2] + (ob.size[2] / 2) > zMax) zMax = ob.pos[2] + (ob.size[2] / 2);
         }
 
-        return [Math.round((xMin + xMax)/2), min, Math.round((yMin + yMax)/2)];
+        return [Math.round((xMin + xMax)/2), yMin, Math.round((zMin + zMax) / 2)];
     }
 
     applyCenter(objects) {
@@ -638,17 +657,17 @@ class Mod {
     }
 
     convert(insert = false) {
-        this.loadFile('convertVoxel', insert);
+        this.loadFile('convertVoxel', [insert]);
     }
 
     voxelToObject(voxel) {
         return {
             'p': [
-                parseInt(voxel[0]) * this.voxelSize, 
-                parseInt(voxel[1]) * this.voxelSize, 
-                parseInt(voxel[2]) * this.voxelSize
+                parseInt(voxel[0]) * this.settings.voxelSize, 
+                parseInt(voxel[1]) * this.settings.voxelSize, 
+                parseInt(voxel[2]) * this.settings.voxelSize
             ], 
-            's': [this.voxelSize, this.voxelSize, this.voxelSize]
+            's': [this.settings.voxelSize, this.settings.voxelSize, this.settings.voxelSize]
         };
     }
 
@@ -988,7 +1007,6 @@ class Mod {
 
     resetSettings() {
         for (let set in this.settings) {
-            console.log(set, this.defaultSettings[set]);
             this.setSettings(set, this.defaultSettings[set]);
         }
         this.gui.updateDisplay();
@@ -1060,7 +1078,8 @@ class Mod {
         this.assetMenu = this.mainMenu.addFolder("Assets");
         let assets = localStorage.getItem('krunk_assets') ? JSON.parse(localStorage.getItem('krunk_assets')) : {};
         
-        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  ;
+        this.assetMenu.add(this.settings, "assetAutoGroup").name("Auto Group").onChange(t => {this.setSettings('assetAutoGroup', t)}); 
+        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t});
         this.assetMenu.add(options, "json").name("Json Import");
         this.assetMenu.add(options, "file").name("File Import");
         this.assetFolder(assets, this.assetMenu);
@@ -1111,6 +1130,7 @@ class Mod {
         
         let voxelsMenu = otherMenu.addFolder('Voxels');
         voxelsMenu.add(this.settings, "mergeVoxels").name("Merge").onChange(t => {this.setSettings('mergeVoxels', t)});
+        voxelsMenu.add(this.settings, "voxelSize").name("Size").onChange(t => {this.setSettings('voxelSize', t)});
         voxelsMenu.add(options, "voxelConvert").name("Convert");
         voxelsMenu.add(options, "voxelImport").name("Import"); 
         
@@ -1160,7 +1180,7 @@ class Mod {
                 let folder = menu.addFolder(ob);
                 this.assetFolder(assets[ob], folder);
             } else {
-                options[ob] = (() => this.replaceObject(JSON.stringify(assets[ob])));
+                options[ob] = (() => this.replaceObject(JSON.stringify(assets[ob]), false, false, this.settings.assetAutoGroup));
                 menu.add(options, ob).name(ob + " [" + assets[ob].length + "]");
             }
         }
@@ -1171,7 +1191,7 @@ class Mod {
         this.removeAd();
         this.addGui();
         this.addControls();
-        window.onbeforeunload = function() {return true};
+        //window.onbeforeunload = function() {return true};
     }
 }
 
@@ -1181,10 +1201,11 @@ GM_xmlhttpRequest({
     onload: res => {
         let code = res.responseText;
         code = code.replace(/String\.prototype\.escape=function\(\){(.*)\)},(Number\.)/, "$2")
-            .replace('("Sky Color").listen().onChange', '("Sky Color").onChange')
-            .replace('("Ambient Light").listen().onChange', '("Ambient Color").onChange')
-            .replace('("Light Color").listen().onChange', '("Light Color").onChange')
-            .replace('("Fog Color").listen().onChange', '("Fog Color").onChange')
+            .replace('("Sky Color").listen()', '("Sky Color")')
+            .replace('("Ambient Light").listen()', '("Ambient Color")')
+            .replace('("Light Color").listen()', '("Light Color")')
+            .replace('("Fog Color").listen()', '("Fog Color")')
+            .replace('("Boost").listen()', '("Boost")')
             .replace(/((\w+).boundingNoncollidableBoxMaterial=new .*}\);)const/, '$1 window.mod.hooks.objectInstance = $2;const')
             //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.editor = $1')
             .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.editor = this,window.mod.loop()')
