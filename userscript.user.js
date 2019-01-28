@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.7.2
+// @version      2.7.3
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.7.0
@@ -110,6 +110,7 @@ class Mod {
         if (!t) return this.loadFile('importMapFile', false);
         try {
             let e = JSON.parse(t);
+            e = e.states || e.id ? e['map'] : e;
             this.hooks.editor.clearMap();
             for (let t of e.objects) this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(t), true);
             delete e.objects,
@@ -131,7 +132,7 @@ class Mod {
             if (!fix) this.hooks.editor.removeObject();
             
             let jsp = JSON.parse(str);
-            jsp = jsp.objects ? jsp.objects : (jsp.map ? jsp.map.objects : jsp);
+            jsp = jsp.objects ? jsp.objects : (jsp.states || jsp.id ? jsp.map.objects : jsp);
             
             let rotation = this.rotation;
             if (fix) {
@@ -299,7 +300,7 @@ class Mod {
 
     reflect(jsp, dir) {
         //justprob <3
-        let obs = jsp.objects ? jsp.objects : (jsp.map ? jsp.map.objects : jsp);
+        let obs = jsp.objects ? jsp.objects : (jsp.states || jsp.id ? jsp.map.objects : jsp);
         let reference = this.findCenter(obs);
         for (let ob of obs) {
             ob.p[dir] * -1;
@@ -1290,6 +1291,7 @@ GM_xmlhttpRequest({
             .replace(/((\w+)=>{)(this\.importMap\(\))/, '$1$2.shiftKey ? window.mod.importMapFile() : $3')
             .replace(/((\w+)=>{)(this\.exportMap\(\))/, '$1 if($2.shiftKey)window.mod.copyToClipboard(this.getMapExport()); $3')
             .replace(/this\.moveSprint\?180:70/, 'this.moveSprint ? window.mod.settings.speedSprint : window.mod.settings.speedNormal')
+            .replace(/(let (\w+)=JSON\.parse\(t\);)(this\.clearMap\(\);)/, "$1$2=$2.states||$2.id?$2['map']:$2;$3")
             
         GM_xmlhttpRequest({
             method: "GET",
