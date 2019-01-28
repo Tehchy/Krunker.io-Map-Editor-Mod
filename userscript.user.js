@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.7.1
+// @version      2.7.2
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.7.0
@@ -131,7 +131,7 @@ class Mod {
             if (!fix) this.hooks.editor.removeObject();
             
             let jsp = JSON.parse(str);
-            jsp = jsp.objects ? jsp.objects : jsp;
+            jsp = jsp.objects ? jsp.objects : (jsp.map ? jsp.map.objects : jsp);
             
             let rotation = this.rotation;
             if (fix) {
@@ -299,7 +299,7 @@ class Mod {
 
     reflect(jsp, dir) {
         //justprob <3
-        let obs = jsp.objects ? jsp.objects : jsp;
+        let obs = jsp.objects ? jsp.objects : (jsp.map ? jsp.map.objects : jsp);
         let reference = this.findCenter(obs);
         for (let ob of obs) {
             ob.p[dir] * -1;
@@ -980,9 +980,6 @@ class Mod {
                         return t.shiftKey ? this.hooks.editor.duplicateObject() : false;
                     case 80: 
                         return this.spawnPlaceholder();
-                    case 192:
-                        this.reflect(JSON.parse(this.hooks.editor.getMapExport()), 0);
-                        break;
                 }
         });
     }
