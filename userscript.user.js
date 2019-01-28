@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.7.3
+// @version      2.7.4
 // @author       Tehchy
 // @include      /^(https?:\/\/)?(www\.)?(.+)krunker\.io\/editor\.html$/
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.7.0
@@ -296,6 +296,7 @@ class Mod {
             ob.p[1] -= center[1];
             ob.p[2] -= center[2];
         }
+        return objects;
     }
 
     reflect(jsp, dir) {
